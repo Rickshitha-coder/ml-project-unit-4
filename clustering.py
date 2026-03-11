@@ -2,40 +2,40 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 
-# Page config
-st.set_page_config(page_title="Market Basket Analysis", page_icon="🛒", layout="wide")
+st.set_page_config(page_title="Market Basket AI Dashboard", page_icon="🛒", layout="wide")
 
-# Title
-st.title("🛒 Market Basket Product Clustering")
-st.markdown("Group products that customers frequently buy together using **K-Means Clustering**.")
+st.title("🛒 Market Basket Product Clustering Dashboard")
+st.markdown("Analyze **product buying patterns** using K-Means clustering and visualize them with PCA.")
 
 # Sidebar
-st.sidebar.header("⚙️ Clustering Settings")
+st.sidebar.header("⚙️ Model Settings")
 
-uploaded_file = st.file_uploader("📂 Upload Market Basket CSV Dataset", type=["csv"])
+uploaded_file = st.file_uploader("📂 Upload Market Basket Dataset", type=["csv"])
 
 if uploaded_file is not None:
 
     df = pd.read_csv(uploaded_file)
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
-    # Dataset preview
     with col1:
-        st.subheader("📊 Dataset Preview")
-        st.dataframe(df.head())
+        st.metric("Total Transactions", df.shape[0])
 
-    # Dataset info
     with col2:
-        st.subheader("📈 Dataset Info")
-        st.metric("Transactions", df.shape[0])
-        st.metric("Products", df.shape[1])
+        st.metric("Total Products", df.shape[1])
 
-    # Cluster slider
+    with col3:
+        st.metric("Dataset Size", f"{df.shape[0]*df.shape[1]} values")
+
+    st.subheader("📊 Dataset Preview")
+    st.dataframe(df.head())
+
+    # Cluster selection
     k = st.sidebar.slider("Select Number of Clusters", 2, 10, 3)
 
-    # Apply KMeans
+    # KMeans clustering
     model = KMeans(n_clusters=k, random_state=42)
     clusters = model.fit_predict(df.T)
 
@@ -46,31 +46,46 @@ if uploaded_file is not None:
         "Cluster": clusters
     })
 
-    st.subheader("🧺 Product Clusters")
+    st.subheader("🧺 Product Cluster Table")
     st.dataframe(result)
 
     # Cluster summary
     st.subheader("📦 Cluster Groups")
 
     for i in range(k):
-        products = result[result["Cluster"] == i]["Product"].tolist()
-        st.write(f"**Cluster {i} →** {', '.join(products)}")
+        items = result[result["Cluster"] == i]["Product"].tolist()
 
-    # Visualization
-    st.subheader("📉 Product Cluster Visualization")
+        if len(items) > 0:
+            st.success(f"Cluster {i}: {', '.join(items)}")
 
-    fig, ax = plt.subplots(figsize=(10,5))
+    # PCA Visualization
+    st.subheader("📉 PCA Cluster Visualization")
 
-    ax.scatter(range(len(product_names)), clusters)
+    pca = PCA(n_components=2)
+    reduced = pca.fit_transform(df.T)
 
-    ax.set_xticks(range(len(product_names)))
-    ax.set_xticklabels(product_names, rotation=45)
+    fig, ax = plt.subplots(figsize=(10,6))
 
-    ax.set_ylabel("Cluster")
-    ax.set_xlabel("Products")
-    ax.set_title("Product Grouping using K-Means")
+    scatter = ax.scatter(reduced[:,0], reduced[:,1], c=clusters)
+
+    for i, product in enumerate(product_names):
+        ax.text(reduced[i,0], reduced[i,1], product)
+
+    ax.set_title("Product Clusters using PCA")
+    ax.set_xlabel("PCA Component 1")
+    ax.set_ylabel("PCA Component 2")
 
     st.pyplot(fig)
 
+    # Download button
+    csv = result.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        label="⬇ Download Clustered Dataset",
+        data=csv,
+        file_name="product_clusters.csv",
+        mime="text/csv"
+    )
+
 else:
-    st.info("⬆️ Upload a dataset to start clustering.")
+    st.info("⬆ Upload a dataset to begin analysis.")
